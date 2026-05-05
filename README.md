@@ -7,13 +7,11 @@ Tooling to audit AWS ECS Fargate task definitions for CrowdStrike Falcon sensor 
 When the Falcon container sensor is deployed to ECS Fargate, it is injected into a task definition as an init container via `falconutil patch-image`. This repo provides two tools:
 
 - **`audit_task_definitions.py`** — queries CrowdStrike Cloud Asset Inventory for all `AWS::ECS::TaskDefinition` resources in your account and reports which task definitions have been patched with the Falcon sensor and which have not.
-- **`register_test_task_definitions.sh`** — registers a set of test task definitions in AWS (5 unpatched, 2 patched) for validating the audit script.
 
 ## Requirements
 
 - Python 3.10+
 - `pip install requests`
-- AWS CLI v2 + `jq` (for `register_test_task_definitions.sh` only)
 - A CrowdStrike API client with **Cloud Security API Assets: Read** scope
 
 ## audit_task_definitions.py
@@ -74,54 +72,3 @@ The script inspects the `containerDefinitions` in each task definition's configu
 
 The Cloud Asset Inventory reflects the state of your AWS account as of the last CSPM assessment. For standard IOM-only accounts this runs on a schedule (default: 2 hours after the last successful scan). AWS accounts with real-time visibility and detection enabled will reflect changes near-instantly.
 
----
-
-## register_test_task_definitions.sh
-
-Registers 7 test task definitions into your AWS account for validating the audit script — 5 unpatched and 2 patched.
-
-### Requirements
-
-- AWS CLI v2 configured with credentials
-- `jq`
-- An ECR image URI for the Falcon container sensor (pushed to your registry)
-- Your CrowdStrike CID with checksum
-
-### Usage
-
-```bash
-./register_test_task_definitions.sh \
-  --falcon-image <ECR_IMAGE_URI> \
-  --cid <CROWDSTRIKE_CID_WITH_CHECKSUM> \
-  [--region us-east-1] \
-  [--role-arn arn:aws:iam::123456789012:role/ECSTaskExecutionRole] \
-  [--dry-run]
-```
-
-Use `--dry-run` to preview the JSON that would be registered without making any AWS API calls.
-
-### Registered families
-
-| Family | Sensor |
-|---|---|
-| `test-unpatched-nginx` | None |
-| `test-unpatched-httpd` | None |
-| `test-unpatched-node-app` | None |
-| `test-unpatched-python-api` | None |
-| `test-unpatched-multi-container` | None |
-| `test-patched-nginx` | Falcon init container |
-| `test-patched-python-api` | Falcon init container |
-
-### Cleanup
-
-```bash
-for family in test-unpatched-nginx test-unpatched-httpd \
-    test-unpatched-node-app test-unpatched-python-api \
-    test-unpatched-multi-container test-patched-nginx \
-    test-patched-python-api; do
-  aws ecs list-task-definitions --family-prefix "$family" \
-    --query 'taskDefinitionArns[]' --output text \
-    | tr '\t' '\n' \
-    | xargs -I{} aws ecs deregister-task-definition --task-definition {}
-done
-```
