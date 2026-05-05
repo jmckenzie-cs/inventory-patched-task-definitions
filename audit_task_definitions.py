@@ -223,6 +223,32 @@ def is_falcon_patched(configuration_raw: str) -> tuple[bool, str]:
     return False, "no Falcon sensor indicators found"
 
 
+def extract_tags(resource: dict) -> dict[str, str]:
+    """
+    Extracts AWS resource tags from a Cloud Asset Inventory resource.
+    Tags may live under resource.tags (list of {key,value}) or
+    resource.configuration (parsed JSON with a 'tags' array).
+    Returns a flat dict of {key: value}.
+    """
+    # Top-level tags field (list of {key, value} dicts)
+    raw_tags = resource.get("tags") or []
+    if isinstance(raw_tags, list) and raw_tags:
+        return {t.get("key", ""): t.get("value", "") for t in raw_tags if t.get("key")}
+
+    # Fall back to tags inside the configuration JSON
+    config_raw = resource.get("configuration", "")
+    if config_raw:
+        try:
+            config = json.loads(config_raw)
+            cfg_tags = config.get("tags") or []
+            if isinstance(cfg_tags, list) and cfg_tags:
+                return {t.get("key", ""): t.get("value", "") for t in cfg_tags if t.get("key")}
+        except json.JSONDecodeError:
+            pass
+
+    return {}
+
+
 def print_report(resources: list[dict], verbose: bool) -> None:
     patched = []
     unpatched = []
@@ -236,6 +262,7 @@ def print_report(resources: list[dict], verbose: bool) -> None:
             "region": r.get("region", ""),
             "arn": r.get("arn", ""),
             "reason": reason,
+            "tags": extract_tags(r),
         }
         if patched_flag:
             patched.append(entry)
@@ -258,6 +285,9 @@ def print_report(resources: list[dict], verbose: bool) -> None:
                 print(f"    Account: {e['account_id']}  Region: {e['region']}")
                 print(f"    ARN:     {e['arn']}")
                 print(f"    Reason:  {e['reason']}")
+                if e["tags"]:
+                    tag_str = "  ".join(f"{k}={v}" for k, v in sorted(e["tags"].items()))
+                    print(f"    Tags:    {tag_str}")
         print()
 
     if unpatched:
@@ -270,6 +300,9 @@ def print_report(resources: list[dict], verbose: bool) -> None:
                 print(f"    Account: {e['account_id']}  Region: {e['region']}")
                 print(f"    ARN:     {e['arn']}")
                 print(f"    Reason:  {e['reason']}")
+                if e["tags"]:
+                    tag_str = "  ".join(f"{k}={v}" for k, v in sorted(e["tags"].items()))
+                    print(f"    Tags:    {tag_str}")
         print()
 
 
@@ -330,6 +363,7 @@ def main():
                 "arn": r.get("arn"),
                 "patched": patched_flag,
                 "reason": reason,
+                "tags": extract_tags(r),
             })
         print(json.dumps(results, indent=2))
     else:

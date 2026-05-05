@@ -121,6 +121,12 @@ register "test-unpatched-nginx" "$(jq -n \
       cpuArchitecture: "X86_64",
       operatingSystemFamily: "LINUX"
     },
+    tags: [
+      {key: "Environment",  value: "production"},
+      {key: "Application",  value: "web-frontend"},
+      {key: "Team",         value: "platform"},
+      {key: "CostCenter",   value: "CC-1001"}
+    ],
     containerDefinitions: [{
       name: "nginx",
       image: "public.ecr.aws/nginx/nginx:stable",
@@ -165,6 +171,12 @@ register "test-unpatched-httpd" "$(jq -n \
       cpuArchitecture: "X86_64",
       operatingSystemFamily: "LINUX"
     },
+    tags: [
+      {key: "Environment",  value: "production"},
+      {key: "Application",  value: "web-server"},
+      {key: "Team",         value: "infrastructure"},
+      {key: "CostCenter",   value: "CC-1002"}
+    ],
     containerDefinitions: [{
       name: "httpd",
       image: "public.ecr.aws/docker/library/httpd:2.4",
@@ -209,6 +221,12 @@ register "test-unpatched-node-app" "$(jq -n \
       cpuArchitecture: "X86_64",
       operatingSystemFamily: "LINUX"
     },
+    tags: [
+      {key: "Environment",  value: "production"},
+      {key: "Application",  value: "node-api"},
+      {key: "Team",         value: "backend"},
+      {key: "CostCenter",   value: "CC-1003"}
+    ],
     containerDefinitions: [{
       name: "node-app",
       image: "public.ecr.aws/docker/library/node:20-alpine",
@@ -256,6 +274,12 @@ register "test-unpatched-python-api" "$(jq -n \
       cpuArchitecture: "X86_64",
       operatingSystemFamily: "LINUX"
     },
+    tags: [
+      {key: "Environment",  value: "staging"},
+      {key: "Application",  value: "python-api"},
+      {key: "Team",         value: "backend"},
+      {key: "CostCenter",   value: "CC-1004"}
+    ],
     containerDefinitions: [{
       name: "python-api",
       image: "public.ecr.aws/docker/library/python:3.12-slim",
@@ -304,6 +328,12 @@ register "test-unpatched-multi-container" "$(jq -n \
       cpuArchitecture: "X86_64",
       operatingSystemFamily: "LINUX"
     },
+    tags: [
+      {key: "Environment",  value: "production"},
+      {key: "Application",  value: "multi-tier-app"},
+      {key: "Team",         value: "platform"},
+      {key: "CostCenter",   value: "CC-1005"}
+    ],
     containerDefinitions: [
       {
         name: "app",
@@ -371,6 +401,13 @@ register "test-patched-nginx" "$(jq -n \
       cpuArchitecture: "X86_64",
       operatingSystemFamily: "LINUX"
     },
+    tags: [
+      {key: "Environment",     value: "production"},
+      {key: "Application",     value: "web-frontend"},
+      {key: "Team",            value: "platform"},
+      {key: "CostCenter",      value: "CC-1006"},
+      {key: "FalconProtected", value: "true"}
+    ],
     volumes: [{
       name: "crowdstrike-falcon-volume"
     }],
@@ -474,6 +511,13 @@ register "test-patched-python-api" "$(jq -n \
       cpuArchitecture: "X86_64",
       operatingSystemFamily: "LINUX"
     },
+    tags: [
+      {key: "Environment",     value: "staging"},
+      {key: "Application",     value: "python-api"},
+      {key: "Team",            value: "backend"},
+      {key: "CostCenter",      value: "CC-1007"},
+      {key: "FalconProtected", value: "true"}
+    ],
     volumes: [{
       name: "crowdstrike-falcon-volume"
     }],

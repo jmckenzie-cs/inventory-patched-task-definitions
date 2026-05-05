@@ -39,7 +39,7 @@ By default the script targets the US-1 cloud and reports only the latest revisio
 | `--cloud` | Falcon cloud: `us-1`, `us-2`, `eu-1`, `us-gov-1`, `us-gov-2` (default: `us-1`) |
 | `--account-id` | Filter by AWS account ID |
 | `--region` | Filter by AWS region |
-| `--verbose` / `-v` | Show account, region, ARN, and detection reason for each result |
+| `--verbose` / `-v` | Show account, region, ARN, AWS tags, and detection reason for each result |
 | `--all-revisions` | Report all revisions instead of latest only |
 | `--json` | Output results as JSON |
 
