@@ -14,7 +14,12 @@ When the Falcon container sensor is deployed to ECS Fargate, it is injected into
 - Python 3.10+
 - `pip install requests`
 - AWS CLI v2 + `jq` (for `register_test_task_definitions.sh` only)
-- A CrowdStrike API client with **Cloud Security API Assets: Read** scope
+
+### Required API scope
+
+> **Cloud Security API Assets: Read**
+
+This is the only scope needed. Create an API client in the Falcon console under **Support and resources > Resources and tools > API clients and keys** with this scope enabled.
 
 ## audit_task_definitions.py
 
