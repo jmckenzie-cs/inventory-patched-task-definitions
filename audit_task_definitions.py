@@ -230,10 +230,10 @@ def extract_tags(resource: dict) -> dict[str, str]:
     resource.configuration (parsed JSON with a 'tags' array).
     Returns a flat dict of {key: value}.
     """
-    # Top-level tags field (list of {key, value} dicts)
-    raw_tags = resource.get("tags") or []
-    if isinstance(raw_tags, list) and raw_tags:
-        return {t.get("key", ""): t.get("value", "") for t in raw_tags if t.get("key")}
+    # Top-level tags field — API returns a flat {"key": "value"} dict
+    raw_tags = resource.get("tags")
+    if isinstance(raw_tags, dict) and raw_tags:
+        return raw_tags
 
     # Fall back to tags inside the configuration JSON
     config_raw = resource.get("configuration", "")
