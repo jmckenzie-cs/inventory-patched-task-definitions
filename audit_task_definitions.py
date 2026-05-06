@@ -149,16 +149,17 @@ def get_resource_details(base_url: str, token: str, ids: list[str]) -> list[dict
     return resources
 
 
-def latest_revisions(resources: list[dict]) -> list[dict]:
+def mark_latest_revisions(resources: list[dict]) -> None:
     """
-    Deduplicate resources by task definition family, keeping only the
-    highest revision number per family. Revision is parsed from the ARN:
+    Annotates each resource with _revision, _family, and _is_latest.
+    _is_latest is True for the highest revision number per family.
+    Revision is parsed from the ARN:
       arn:aws:ecs:<region>:<account>:task-definition/<family>:<revision>
     """
-    latest: dict[str, dict] = {}
+    # First pass: find the highest revision per family
+    latest: dict[str, int] = {}
     for r in resources:
         arn = r.get("arn") or r.get("resource_id", "")
-        # Extract family and revision from the ARN suffix (family:revision)
         td_part = arn.split("task-definition/")[-1] if "task-definition/" in arn else ""
         if ":" in td_part:
             family, rev_str = td_part.rsplit(":", 1)
@@ -169,14 +170,14 @@ def latest_revisions(resources: list[dict]) -> list[dict]:
         else:
             family = td_part or arn
             revision = 0
+        r["_revision"] = revision
+        r["_family"] = family
+        if revision > latest.get(family, -1):
+            latest[family] = revision
 
-        existing = latest.get(family)
-        if existing is None or revision > existing["_revision"]:
-            r["_revision"] = revision
-            r["_family"] = family
-            latest[family] = r
-
-    return list(latest.values())
+    # Second pass: mark latest
+    for r in resources:
+        r["_is_latest"] = r["_revision"] == latest.get(r["_family"], -1)
 
 
 def is_falcon_patched(configuration_raw: str) -> tuple[bool, str]:
@@ -263,6 +264,7 @@ def print_report(resources: list[dict], verbose: bool) -> None:
             "arn": r.get("arn", ""),
             "reason": reason,
             "tags": extract_tags(r),
+            "latest": r.get("_is_latest", False),
         }
         if patched_flag:
             patched.append(entry)
@@ -270,7 +272,7 @@ def print_report(resources: list[dict], verbose: bool) -> None:
             unpatched.append(entry)
 
     total = len(resources)
-    print(f"\nTask Definition Audit — {total} task definition(s) found\n")
+    print(f"\nTask Definition Audit — {total} revision(s) found\n")
     print(f"  Patched:   {len(patched)}")
     print(f"  Unpatched: {len(unpatched)}")
     print()
@@ -280,7 +282,8 @@ def print_report(resources: list[dict], verbose: bool) -> None:
         print("PATCHED (Falcon sensor detected)")
         print("=" * 60)
         for e in patched:
-            print(f"  {e['name']}")
+            latest_marker = " [latest]" if e["latest"] else ""
+            print(f"  {e['name']}{latest_marker}")
             if verbose:
                 print(f"    Account: {e['account_id']}  Region: {e['region']}")
                 print(f"    ARN:     {e['arn']}")
@@ -295,7 +298,8 @@ def print_report(resources: list[dict], verbose: bool) -> None:
         print("UNPATCHED (no Falcon sensor detected)")
         print("=" * 60)
         for e in unpatched:
-            print(f"  {e['name']}")
+            latest_marker = " [latest]" if e["latest"] else ""
+            print(f"  {e['name']}{latest_marker}")
             if verbose:
                 print(f"    Account: {e['account_id']}  Region: {e['region']}")
                 print(f"    ARN:     {e['arn']}")
@@ -323,7 +327,6 @@ def main():
     parser.add_argument("--account-id", default=None, help="Filter by AWS account ID")
     parser.add_argument("--region", default=None, help="Filter by AWS region")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show account, region, ARN, and detection reason for each task definition")
-    parser.add_argument("--all-revisions", action="store_true", help="Report all revisions instead of latest only")
     parser.add_argument("--json", dest="json_output", action="store_true", help="Output results as JSON instead of human-readable text")
 
     args = parser.parse_args()
@@ -344,12 +347,7 @@ def main():
 
     print(f"Fetching details for {len(ids)} task definition(s)...", file=sys.stderr)
     resources = get_resource_details(base_url, token, ids)
-
-    if not args.all_revisions:
-        before = len(resources)
-        resources = latest_revisions(resources)
-        if before != len(resources):
-            print(f"Deduplicated to {len(resources)} unique family/revision(s) (use --all-revisions to see all).", file=sys.stderr)
+    mark_latest_revisions(resources)
 
     if args.json_output:
         results = []
@@ -362,6 +360,7 @@ def main():
                 "region": r.get("region"),
                 "arn": r.get("arn"),
                 "patched": patched_flag,
+                "latest": r.get("_is_latest", False),
                 "reason": reason,
                 "tags": extract_tags(r),
             })
