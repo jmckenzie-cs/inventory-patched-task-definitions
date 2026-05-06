@@ -41,11 +41,12 @@ By default the script targets the US-1 cloud and reports all revisions of each t
 |---|---|
 | `--client-id` | Falcon API client ID (or set `FALCON_CLIENT_ID`) |
 | `--client-secret` | Falcon API client secret (or set `FALCON_CLIENT_SECRET`) |
-| `--cloud` | Falcon cloud: `us-1`, `us-2`, `eu-1`, `us-gov-1`, `us-gov-2` (default: `us-1`) |
+| `--cloud` | Falcon cloud: `us-1`, `us-2`, `eu-1`, `us-gov-1`, `us-gov-2` (default: `us-1`, or set `FALCON_CLOUD`) |
 | `--account-id` | Filter by AWS account ID |
 | `--region` | Filter by AWS region |
-| `--verbose` / `-v` | Show account, region, ARN, AWS tags, and detection reason for each result |
+| `--verbose` / `-v` | Show account, region, ARN, tags, and detection reason for each result |
 | `--json` | Output results as JSON |
+| `--markdown` | Output results as a Markdown report |
 
 ### Examples
 
@@ -56,8 +57,11 @@ python3 audit_task_definitions.py --cloud us-2 --verbose
 # Filter to a specific account and region
 python3 audit_task_definitions.py --account-id 123456789012 --region us-east-1
 
-# JSON output for scripting
-python3 audit_task_definitions.py --json | jq '.[] | select(.patched == false and .latest == true)'
+# Export a Markdown report
+python3 audit_task_definitions.py --markdown > report.md
+
+# JSON output — filter to latest unpatched with active tasks
+python3 audit_task_definitions.py --json | jq '.[] | select(.patched == false and .latest == true and .active_tasks > 0)'
 ```
 
 ### Detection logic
