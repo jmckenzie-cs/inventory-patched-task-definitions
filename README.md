@@ -109,6 +109,7 @@ Use `--dry-run` to preview the JSON that would be registered without making any 
 | `test-unpatched-node-app` | None |
 | `test-unpatched-python-api` | None |
 | `test-unpatched-multi-container` | None |
+| `test-unpatched-redis` | None |
 | `test-patched-nginx` | Falcon init container |
 | `test-patched-python-api` | Falcon init container |
 
@@ -117,8 +118,8 @@ Use `--dry-run` to preview the JSON that would be registered without making any 
 ```bash
 for family in test-unpatched-nginx test-unpatched-httpd \
     test-unpatched-node-app test-unpatched-python-api \
-    test-unpatched-multi-container test-patched-nginx \
-    test-patched-python-api; do
+    test-unpatched-multi-container test-unpatched-redis \
+    test-patched-nginx test-patched-python-api; do
   aws ecs list-task-definitions --family-prefix "$family" \
     --query 'taskDefinitionArns[]' --output text \
     | tr '\t' '\n' \

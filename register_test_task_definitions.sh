@@ -111,6 +111,7 @@ register "test-unpatched-nginx" "$(jq -n \
   --arg region "$REGION" \
   '{
     family: "test-unpatched-nginx",
+    
     networkMode: "awsvpc",
     requiresCompatibilities: ["FARGATE"],
     cpu: "256",
@@ -125,7 +126,7 @@ register "test-unpatched-nginx" "$(jq -n \
       {key: "Environment",  value: "production"},
       {key: "Application",  value: "web-frontend"},
       {key: "Team",         value: "platform"},
-      {key: "CostCenter",   value: "CC-1001"}
+      {key: "CostCenter",   value: "CC-1011"}
     ],
     containerDefinitions: [{
       name: "nginx",
@@ -161,6 +162,7 @@ register "test-unpatched-httpd" "$(jq -n \
   --arg region "$REGION" \
   '{
     family: "test-unpatched-httpd",
+    
     networkMode: "awsvpc",
     requiresCompatibilities: ["FARGATE"],
     cpu: "256",
@@ -175,7 +177,7 @@ register "test-unpatched-httpd" "$(jq -n \
       {key: "Environment",  value: "production"},
       {key: "Application",  value: "web-server"},
       {key: "Team",         value: "infrastructure"},
-      {key: "CostCenter",   value: "CC-1002"}
+      {key: "CostCenter",   value: "CC-1012"}
     ],
     containerDefinitions: [{
       name: "httpd",
@@ -211,6 +213,7 @@ register "test-unpatched-node-app" "$(jq -n \
   --arg region "$REGION" \
   '{
     family: "test-unpatched-node-app",
+    
     networkMode: "awsvpc",
     requiresCompatibilities: ["FARGATE"],
     cpu: "512",
@@ -225,7 +228,7 @@ register "test-unpatched-node-app" "$(jq -n \
       {key: "Environment",  value: "production"},
       {key: "Application",  value: "node-api"},
       {key: "Team",         value: "backend"},
-      {key: "CostCenter",   value: "CC-1003"}
+      {key: "CostCenter",   value: "CC-1013"}
     ],
     containerDefinitions: [{
       name: "node-app",
@@ -264,6 +267,7 @@ register "test-unpatched-python-api" "$(jq -n \
   --arg region "$REGION" \
   '{
     family: "test-unpatched-python-api",
+    
     networkMode: "awsvpc",
     requiresCompatibilities: ["FARGATE"],
     cpu: "512",
@@ -278,7 +282,7 @@ register "test-unpatched-python-api" "$(jq -n \
       {key: "Environment",  value: "staging"},
       {key: "Application",  value: "python-api"},
       {key: "Team",         value: "backend"},
-      {key: "CostCenter",   value: "CC-1004"}
+      {key: "CostCenter",   value: "CC-1014"}
     ],
     containerDefinitions: [{
       name: "python-api",
@@ -312,12 +316,63 @@ register "test-unpatched-python-api" "$(jq -n \
   }'
 )"
 
-# 5. Two-container app (sidecar pattern) — no sensor
+# 5. Redis cache — no sensor
+register "test-unpatched-redis" "$(jq -n \
+  --arg role "$ROLE_ARN" \
+  --arg region "$REGION" \
+  '{
+    family: "test-unpatched-redis",
+    networkMode: "awsvpc",
+    requiresCompatibilities: ["FARGATE"],
+    cpu: "512",
+    memory: "1024",
+    executionRoleArn: $role,
+    taskRoleArn: $role,
+    runtimePlatform: {
+      cpuArchitecture: "X86_64",
+      operatingSystemFamily: "LINUX"
+    },
+    tags: [
+      {key: "Environment", value: "production"},
+      {key: "Application", value: "cache"},
+      {key: "Team",        value: "backend"},
+      {key: "CostCenter",  value: "CC-1008"},
+      {key: "owner",       value: "mckenzie"}
+    ],
+    containerDefinitions: [{
+      name: "redis",
+      image: "public.ecr.aws/docker/library/redis:7-alpine",
+      essential: true,
+      cpu: 0,
+      portMappings: [{
+        name: "redis-6379-tcp",
+        containerPort: 6379,
+        hostPort: 6379,
+        protocol: "tcp"
+      }],
+      environment: [],
+      mountPoints: [],
+      volumesFrom: [],
+      logConfiguration: {
+        logDriver: "awslogs",
+        options: {
+          "awslogs-create-group": "true",
+          "awslogs-group": "/ecs/test-td-audit",
+          "awslogs-region": $region,
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }]
+  }'
+)"
+
+# 6. Two-container app (sidecar pattern) — no sensor
 register "test-unpatched-multi-container" "$(jq -n \
   --arg role "$ROLE_ARN" \
   --arg region "$REGION" \
   '{
     family: "test-unpatched-multi-container",
+    
     networkMode: "awsvpc",
     requiresCompatibilities: ["FARGATE"],
     cpu: "512",
@@ -332,7 +387,7 @@ register "test-unpatched-multi-container" "$(jq -n \
       {key: "Environment",  value: "production"},
       {key: "Application",  value: "multi-tier-app"},
       {key: "Team",         value: "platform"},
-      {key: "CostCenter",   value: "CC-1005"}
+      {key: "CostCenter",   value: "CC-1015"}
     ],
     containerDefinitions: [
       {
@@ -391,6 +446,7 @@ register "test-patched-nginx" "$(jq -n \
   --arg falconCid "$FALCON_CID" \
   '{
     family: "test-patched-nginx",
+    
     networkMode: "awsvpc",
     requiresCompatibilities: ["FARGATE"],
     cpu: "512",
@@ -405,7 +461,7 @@ register "test-patched-nginx" "$(jq -n \
       {key: "Environment",     value: "production"},
       {key: "Application",     value: "web-frontend"},
       {key: "Team",            value: "platform"},
-      {key: "CostCenter",      value: "CC-1006"},
+      {key: "CostCenter",      value: "CC-1016"},
       {key: "FalconProtected", value: "true"}
     ],
     volumes: [{
@@ -501,6 +557,7 @@ register "test-patched-python-api" "$(jq -n \
   --arg falconCid "$FALCON_CID" \
   '{
     family: "test-patched-python-api",
+    
     networkMode: "awsvpc",
     requiresCompatibilities: ["FARGATE"],
     cpu: "512",
@@ -515,7 +572,7 @@ register "test-patched-python-api" "$(jq -n \
       {key: "Environment",     value: "staging"},
       {key: "Application",     value: "python-api"},
       {key: "Team",            value: "backend"},
-      {key: "CostCenter",      value: "CC-1007"},
+      {key: "CostCenter",      value: "CC-1017"},
       {key: "FalconProtected", value: "true"}
     ],
     volumes: [{
@@ -609,12 +666,13 @@ echo "════════════════════════�
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "  Dry run complete — no task definitions registered"
 else
-  echo "  Done. Registered 7 task definitions:"
+  echo "  Done. Registered 8 task definitions:"
   echo "    Unpatched: test-unpatched-nginx"
   echo "               test-unpatched-httpd"
   echo "               test-unpatched-node-app"
   echo "               test-unpatched-python-api"
   echo "               test-unpatched-multi-container"
+  echo "               test-unpatched-redis"
   echo "    Patched:   test-patched-nginx"
   echo "               test-patched-python-api"
   echo ""
@@ -623,8 +681,8 @@ else
   echo "  To deregister all test TDs when done:"
   echo "    for family in test-unpatched-nginx test-unpatched-httpd \\"
   echo "        test-unpatched-node-app test-unpatched-python-api \\"
-  echo "        test-unpatched-multi-container test-patched-nginx \\"
-  echo "        test-patched-python-api; do"
+  echo "        test-unpatched-multi-container test-unpatched-redis \\"
+  echo "        test-patched-nginx test-patched-python-api; do"
   echo "      aws ecs list-task-definitions --family-prefix \"\$family\" \\"
   echo "        --query 'taskDefinitionArns[]' --output text \\"
   echo "        | tr '\\t' '\\n' \\"
