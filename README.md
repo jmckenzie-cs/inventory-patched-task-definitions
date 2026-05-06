@@ -7,7 +7,7 @@ Tooling to audit AWS ECS Fargate task definitions for CrowdStrike Falcon sensor 
 When the Falcon container sensor is deployed to ECS Fargate, it is injected into a task definition as an init container via `falconutil patch-image`. This repo provides two tools:
 
 - **`audit_task_definitions.py`** — queries CrowdStrike Cloud Asset Inventory for all `AWS::ECS::TaskDefinition` resources in your account and reports which task definitions have been patched with the Falcon sensor and which have not.
-- **`register_test_task_definitions.sh`** — registers a set of test task definitions in AWS (5 unpatched, 2 patched) for validating the audit script.
+- **`register_test_task_definitions.sh`** — registers a set of test task definitions in AWS (6 unpatched, 2 patched) for validating the audit script.
 
 ## Requirements
 
@@ -69,6 +69,10 @@ The script inspects the `containerDefinitions` in each task definition's configu
 ### Note on assessment frequency
 
 The Cloud Asset Inventory reflects the state of your AWS account as of the last CSPM assessment. For standard IOM-only accounts this runs on a schedule (default: 2 hours after the last successful scan). AWS accounts with real-time visibility and detection enabled will reflect changes near-instantly.
+
+### Example output
+
+See [`example-report.txt`](example-report.txt) for a sample of `--verbose` output showing `[latest]` markers, tags, and detection reasons across multiple revisions.
 
 ---
 
