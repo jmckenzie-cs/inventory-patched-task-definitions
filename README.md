@@ -28,7 +28,7 @@ export FALCON_CLIENT_SECRET=<your_client_secret>
 python3 audit_task_definitions.py
 ```
 
-By default the script targets the US-1 cloud and reports only the latest revision of each task definition family.
+By default the script targets the US-1 cloud and reports all revisions of each task definition family, marking the latest revision of each family with `[latest]`. This makes it easy to spot when the Falcon sensor was present in a prior revision but dropped in a newer one.
 
 ### Options
 
@@ -40,7 +40,6 @@ By default the script targets the US-1 cloud and reports only the latest revisio
 | `--account-id` | Filter by AWS account ID |
 | `--region` | Filter by AWS region |
 | `--verbose` / `-v` | Show account, region, ARN, AWS tags, and detection reason for each result |
-| `--all-revisions` | Report all revisions instead of latest only |
 | `--json` | Output results as JSON |
 
 ### Examples
@@ -53,10 +52,7 @@ python3 audit_task_definitions.py --cloud us-2 --verbose
 python3 audit_task_definitions.py --account-id 123456789012 --region us-east-1
 
 # JSON output for scripting
-python3 audit_task_definitions.py --json | jq '.[] | select(.patched == false)'
-
-# Show all revisions, not just latest
-python3 audit_task_definitions.py --all-revisions --verbose
+python3 audit_task_definitions.py --json | jq '.[] | select(.patched == false and .latest == true)'
 ```
 
 ### Detection logic
@@ -78,7 +74,7 @@ The Cloud Asset Inventory reflects the state of your AWS account as of the last 
 
 ## register_test_task_definitions.sh
 
-Registers 7 test task definitions into your AWS account for validating the audit script — 5 unpatched and 2 patched.
+Registers 8 test task definitions into your AWS account for validating the audit script — 6 unpatched and 2 patched.
 
 ### Requirements
 
