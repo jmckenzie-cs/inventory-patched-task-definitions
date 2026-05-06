@@ -180,6 +180,69 @@ def mark_latest_revisions(resources: list[dict]) -> None:
         r["_is_latest"] = r["_revision"] == latest.get(r["_family"], -1)
 
 
+def get_active_task_counts(
+    base_url: str,
+    token: str,
+    account_id: Optional[str],
+    region: Optional[str],
+) -> dict[str, int]:
+    """
+    Queries active AWS::ECS::Task resources and returns a dict mapping
+    task definition family name -> count of active running tasks.
+    """
+    fql_parts = ["resource_type:'AWS::ECS::Task'", "active:'true'"]
+    if account_id:
+        fql_parts.append(f"account_id:'{account_id}'")
+    if region:
+        fql_parts.append(f"region:'{region}'")
+    fql = "+".join(fql_parts)
+
+    headers = {"Authorization": f"Bearer {token}"}
+    ids = []
+    offset = 0
+    limit = 500
+
+    while True:
+        resp = requests.get(
+            f"{base_url}/cloud-security-assets/queries/resources/v1",
+            params={"filter": fql, "limit": limit, "offset": offset},
+            headers=headers,
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            print(f"WARNING: Active task query failed ({resp.status_code}) — skipping", file=sys.stderr)
+            return {}
+        data = resp.json()
+        batch = data.get("resources") or []
+        ids.extend(batch)
+        total = data.get("meta", {}).get("pagination", {}).get("total", 0)
+        offset += len(batch)
+        if offset >= total or not batch:
+            break
+
+    if not ids:
+        return {}
+
+    tasks = get_resource_details(base_url, token, ids)
+    counts: dict[str, int] = {}
+    for t in tasks:
+        config_raw = t.get("configuration") or ""
+        if not config_raw:
+            continue
+        try:
+            config = json.loads(config_raw)
+        except json.JSONDecodeError:
+            continue
+        td_arn = config.get("taskDefinitionArn", "")
+        if "task-definition/" not in td_arn:
+            continue
+        family = td_arn.split("task-definition/")[-1].rsplit(":", 1)[0]
+        if family:
+            counts[family] = counts.get(family, 0) + 1
+
+    return counts
+
+
 def is_falcon_patched(configuration_raw: str) -> tuple[bool, str]:
     """
     Inspects the task definition's configuration JSON for signs that
@@ -250,7 +313,7 @@ def extract_tags(resource: dict) -> dict[str, str]:
     return {}
 
 
-def print_report(resources: list[dict], verbose: bool) -> None:
+def print_report(resources: list[dict], verbose: bool, active_counts: dict[str, int]) -> None:
     patched = []
     unpatched = []
 
@@ -265,6 +328,7 @@ def print_report(resources: list[dict], verbose: bool) -> None:
             "reason": reason,
             "tags": extract_tags(r),
             "latest": r.get("_is_latest", False),
+            "active_tasks": active_counts.get(r.get("_family", ""), 0),
         }
         if patched_flag:
             patched.append(entry)
@@ -299,7 +363,8 @@ def print_report(resources: list[dict], verbose: bool) -> None:
         print("=" * 60)
         for e in unpatched:
             latest_marker = " [latest]" if e["latest"] else ""
-            print(f"  {e['name']}{latest_marker}")
+            active_marker = f" [⚠ {e['active_tasks']} active task(s)]" if e["latest"] and e["active_tasks"] else ""
+            print(f"  {e['name']}{latest_marker}{active_marker}")
             if verbose:
                 print(f"    Account: {e['account_id']}  Region: {e['region']}")
                 print(f"    ARN:     {e['arn']}")
@@ -308,6 +373,60 @@ def print_report(resources: list[dict], verbose: bool) -> None:
                     tag_str = "  ".join(f"{k}={v}" for k, v in sorted(e["tags"].items()))
                     print(f"    Tags:    {tag_str}")
         print()
+
+
+def print_markdown_report(resources: list[dict], active_counts: dict[str, int]) -> None:
+    from datetime import datetime, timezone
+    patched = []
+    unpatched = []
+
+    for r in resources:
+        config_raw = r.get("configuration", "")
+        patched_flag, reason = is_falcon_patched(config_raw)
+        entry = {
+            "name": r.get("resource_name") or r.get("resource_id", "unknown"),
+            "account_id": r.get("account_id", ""),
+            "region": r.get("region", ""),
+            "arn": r.get("arn", ""),
+            "reason": reason,
+            "tags": extract_tags(r),
+            "latest": r.get("_is_latest", False),
+            "active_tasks": active_counts.get(r.get("_family", ""), 0),
+        }
+        if patched_flag:
+            patched.append(entry)
+        else:
+            unpatched.append(entry)
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    total = len(resources)
+    print(f"# ECS Task Definition Audit")
+    print(f"\n_Generated: {now}_\n")
+    print(f"| | Count |")
+    print(f"|---|---|")
+    print(f"| Total revisions | {total} |")
+    print(f"| Patched | {len(patched)} |")
+    print(f"| Unpatched | {len(unpatched)} |")
+    print(f"| Unpatched with active tasks | {sum(1 for e in unpatched if e['latest'] and e['active_tasks'])} |")
+
+    print(f"\n## Patched\n")
+    print(f"| Task Definition | Account | Region | Latest | Detection | Tags |")
+    print(f"|---|---|---|---|---|---|")
+    for e in patched:
+        latest = "✅" if e["latest"] else ""
+        tag_str = " ".join(f"`{k}={v}`" for k, v in sorted(e["tags"].items())) if e["tags"] else ""
+        td = e["arn"].split("task-definition/")[-1] if "task-definition/" in e["arn"] else e["name"]
+        print(f"| `{td}` | {e['account_id']} | {e['region']} | {latest} | {e['reason']} | {tag_str} |")
+
+    print(f"\n## Unpatched\n")
+    print(f"| Task Definition | Account | Region | Latest | Active Tasks | Tags |")
+    print(f"|---|---|---|---|---|---|")
+    for e in unpatched:
+        latest = "⚠️" if e["latest"] else ""
+        active = f"🔴 {e['active_tasks']}" if e["latest"] and e["active_tasks"] else ""
+        tag_str = " ".join(f"`{k}={v}`" for k, v in sorted(e["tags"].items())) if e["tags"] else ""
+        td = e["arn"].split("task-definition/")[-1] if "task-definition/" in e["arn"] else e["name"]
+        print(f"| `{td}` | {e['account_id']} | {e['region']} | {latest} | {active} | {tag_str} |")
 
 
 def main():
@@ -328,6 +447,7 @@ def main():
     parser.add_argument("--region", default=None, help="Filter by AWS region")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show account, region, ARN, and detection reason for each task definition")
     parser.add_argument("--json", dest="json_output", action="store_true", help="Output results as JSON instead of human-readable text")
+    parser.add_argument("--markdown", dest="markdown_output", action="store_true", help="Output results as a Markdown report")
 
     args = parser.parse_args()
 
@@ -349,6 +469,9 @@ def main():
     resources = get_resource_details(base_url, token, ids)
     mark_latest_revisions(resources)
 
+    print("Querying active running tasks...", file=sys.stderr)
+    active_counts = get_active_task_counts(base_url, token, args.account_id, args.region)
+
     if args.json_output:
         results = []
         for r in resources:
@@ -361,12 +484,15 @@ def main():
                 "arn": r.get("arn"),
                 "patched": patched_flag,
                 "latest": r.get("_is_latest", False),
+                "active_tasks": active_counts.get(r.get("_family", ""), 0),
                 "reason": reason,
                 "tags": extract_tags(r),
             })
         print(json.dumps(results, indent=2))
+    elif args.markdown_output:
+        print_markdown_report(resources, active_counts)
     else:
-        print_report(resources, args.verbose)
+        print_report(resources, args.verbose, active_counts)
 
 
 if __name__ == "__main__":
