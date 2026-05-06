@@ -77,7 +77,7 @@ The Cloud Asset Inventory reflects the state of your AWS account as of the last 
 
 ### Example output
 
-See [`example-report.txt`](example-report.txt) for a sample of `--verbose` output showing `[latest]` markers, tags, and detection reasons across multiple revisions.
+See [`example-report.md`](example-report.md) for a sample `--markdown` report showing `[latest]` markers, tags, active task indicators, and detection reasons across multiple revisions.
 
 ---
 
